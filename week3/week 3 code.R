@@ -15,6 +15,7 @@
 # They bring in a number of user-written functions or libraries.
 # Googling the package name will open up a host of support materials, 
 # including the official documentation on CRAN.
+# Ref : https://cran.r-project.org/web/packages/quanteda/vignettes/quickstart.html
 
 install.packages("readtext")
 install.packages("quanteda")
@@ -35,7 +36,7 @@ library(ggplot2)
 # You can also use the menus at the top of the screen: Session > Set Working Directory > Choose Directory
 # Note that a "directory" is a folder
     
-setwd("C:/Users/calexander/Dropbox/Courses/LA2 S21/data/10_txt")
+setwd("C:\\Users\\chris.cirelli\\Desktop\\repositories\\gsu_legal_analytics_course\\week3\\txt_data")
 # Above is Prof. Alexander's working directory; you'll need to set your own
 # This script runs only on the 2018 Cong. Rec. documents. 
 # You will need to run your homework on the full set of 2018-2020 documents. 
@@ -53,11 +54,15 @@ tail(cr_txt)
 # Create a corpus from your text object
 cr_corpus <- corpus(cr_txt)
 
+
 # Check it out
 ndoc(cr_corpus)
+class(cr_corpus)
 
 # Convert your corpus to a document-feature-matrix (dfm)
-cr_dfm <- dfm(cr_corpus)
+cr_dfm <- dfm(cr_corpus)  # Does this do any preprocessing?  How does it tokenize?
+                          # According to the professor it tokenizes based on white spaces
+                          # and standalone punctuation (so essentially str.split(' '))
 
 # View the top (head) of the dfm
 View(head(cr_dfm))
@@ -70,18 +75,22 @@ textstat_frequency(cr_dfm)
 # Quanteda has built-in functions for dropping stopwords, symbols, numbers
 # Refer to week 3 reading (Denny & Spirling) for more information on text cleaning
 stopwords("en")
+print('hello world')
 
 # You can customize your list of stopwords by removing or adding terms.
 
 # Remove words from the standard stopwords list
 my_stopwords <- stopwords('en')
 
-my_stopwords = my_stopwords[-c(which(my_stopwords=="i"))]
+my_stopwords = my_stopwords[-c(which(my_stopwords=="i"))] #Take off of stopword list "i"
 
 my_stopwords
+summary(my_stopwords)
+help(summary)
 
 # Add words to the standard stopwords list 
 my_stopwords <- c("economic", my_stopwords)
+my_stopwords <- c(-c(which(my_stopwords=="i")))
 
 # Read words in from a txt file in your working directory or elsewhere
 more_stopwords <- readLines("C:/Users/calexander/Dropbox/Courses/LA2 S21/more_stopwords.txt")
@@ -91,10 +100,11 @@ my_stopwords <- c(my_stopwords, more_stopwords)
 
 # Re-run the dfm step with cleaning steps added
 cr_dfm_clean <- dfm(cr_corpus,
-                remove = my_stopwords, 
+                remove = my_stopwords, # can sub in 'en' vs my_stopwords to get all english stopwords
                 remove_punct = TRUE,
                 remove_numbers = TRUE,
                 remove_symbols = TRUE)
+
 
 # You can also stem the words in your corpus
 # Do this as a second step after removing stopwords
@@ -109,6 +119,7 @@ cr_dfm_cleaner <- dfm(cr_dfm_clean, stem = TRUE)
 cr_dfm_trimmed <- dfm_trim(cr_dfm_cleaner,
                      min_docfreq=5,
                      min_termfreq=10)
+cr_dfm_trimmed
 
 # A side note on saving: to save individual objects, especially those that take some time to generate,
 # or to save everything in your workspace, do the following:
@@ -132,6 +143,7 @@ textstat_frequency(cr_dfm_trimmed)
 # Assign your textstat_frequency results to an object
 tstat <- textstat_frequency(cr_dfm_trimmed)
 tstat
+head(tstat[1:20, 1:2])
 
 # Generate the plot -- top 20 words
 ggplot(tstat[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
@@ -141,7 +153,7 @@ ggplot(tstat[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
 
 # Word cloud
 # Open a new plot window for better viewing
-dev.new(width = 1000, height = 1000, unit = "px")
+dev.new(width = 2000, height = 2000, unit = "px")
 
 # Generate the word cloud
 textplot_wordcloud(cr_dfm_trimmed, max_words = 100) # Top 100 words
@@ -157,6 +169,7 @@ cr_toks <- tokens(cr_corpus,
 
 # Removing stopwords
 cr_toks <- tokens_remove(cr_toks, pattern = stopwords('en'))
+cr_toks
 
 # Stemming
 cr_toks <- tokens_wordstem(cr_toks, language = quanteda_options("language_stemmer"))
