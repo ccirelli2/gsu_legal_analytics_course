@@ -1,0 +1,12 @@
+Load the R workspace called 2018_2020_workspace.RData 
+(available on Teams in Files >> Data) into your R Studio session.
+
+Using the txt, corpus, and dfm objects, answer the following questions
+in a brief report (1-2 pages), one report per group:
+
+1. How many documents are in this corpus?
+2. What are the top 10 tokens and their frequency?
+3. From your review of the frequency table, what are additional
+   stopwords that you would like to drop from the 2018-2020 dfm?
+4. Generate a wordcloud and textstat_frequency plot to show the
+   top 50 words in the 2018-2020 dfm and include them in your report.
