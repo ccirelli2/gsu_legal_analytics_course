@@ -31,14 +31,15 @@ library(textdata)
 
 # Alternatively, set your working directory to the location of the 
 # 10_txt folder on your machine.
-setwd("C:/Users/charl/Dropbox/Courses/LA2 S21/data/10_txt")
+setwd("C:\\Users\\chris.cirelli\\Desktop\\repositories\\gsu_legal_analytics_course\\data")
 
 # Read in your dataset; create corpus, tokens, and dfm objects
 # Note that the functions below take different objects as inputs: tokens, corpus, dfm
-cr_txt <- readtext("*")
+cr_txt <- readtext("*.txt")
 cr_corpus <- corpus(cr_txt)
 cr_toks <- tokens(cr_corpus)
 cr_dfm <- dfm(cr_corpus)
+summary(cr_dfm)
 
 ########################### SYNONYMS VIA GLOVE WORD EMBEDDINGS ###########################
 # https://cran.r-project.org/web/packages/text2vec/vignettes/glove.html
@@ -51,7 +52,7 @@ cossim = function(x,y)
   denominator = sqrt(sum(x^2)) * sqrt(sum(y^2))
   return(list(cosine_similarity = numerator/denominator))
 }
-
+ 
 ## Create function for finding list of the N most similar terms
 most_similar = function(x,y,method="cosine",N=10)
 {
@@ -68,14 +69,18 @@ fcm <- fcm(cr_toks,
            weights = 1 / (1:5), 
            tri = TRUE)
 
+help(fcm)
+
 # Set up and fit the GloVe model
 glove <- GlobalVectors$new(rank = 50, x_max = 10)
 
 # Apply model to fcm
 fcm_tokens <- glove$fit_transform(fcm, n_iter = 20)
+fcm_tokens
 
 # Create list of N most similar words
-most_similar(fcm_tokens, "economic")
+most_similar(fcm_tokens, "PROCEEDINGS")
+
 
 ########################### DICTIONARY LOOKUPS ###########################
 # https://tutorials.quanteda.io/basic-operations/dfm/dfm_lookup/
@@ -92,7 +97,7 @@ write.table(dfm_keywords, "dfm_keywords.csv")
 
 # Alternative: read in list of keywords from txt document
 # Use dfm_select on the basis of that object 
-keywords <- readLines("keywords.txt")
+keywords <- readLines("dfm_keywords.csv")
 
 dfm_keywords <- dfm_select(cr_dfm, pattern = keywords, 
                            selection = "keep")
@@ -100,28 +105,37 @@ dfm_keywords <- dfm_select(cr_dfm, pattern = keywords,
 # Another alternative: create a dictionary object to group multiple words under a single label
 # Then use dfm_lookup
 # https://www.rdocumentation.org/packages/quanteda/versions/2.1.2/topics/dfm_lookup
+# *tax - wildcard - R will pull out any match of tax
 
 dict <- dictionary(list(worker = c("worker", "union", "employee"),
                         consumer = c("consumer", "prices", "competition"),
                         taxglob = "tax*"))
 
-dfm_keywords <- dfm_lookup(cr_dfm, dict, valuetype = "glob") # Specify glob because one dictionary item is in glob format
+#*** Note that the frequencies roll up into the worker key, not per token frequency.
+# Pass the dictionary to dfm_lookup to build your dfm
+dfm_keywords <- dfm_lookup(cr_dfm, dict, valuetype = "glob",
+                           case_insensitive = FALSE) # Specify glob because one dictionary item is in glob format
+dfm_keywords
 
 View(dfm_keywords) # Note that this sums all dictionary word counts
 
 # Option: add case_insensitive = TRUE or FALSE within parentheses
 
-## What if you have longer ngrams as keywords?
-# Don't need to turn everything into a bigram; targeted bigram creation within tokens object
+
+
+
+# Generate Bi-grams
 
 cr_toks2 <- tokens_replace(cr_toks, phrase(c("minimum wage")), 
                        phrase(c("minimum_wage")))
+
 
 # Alternative: tokens_compound, or use regular expressions
 # https://tutorials.quanteda.io/advanced-operations/compound-mutiword-expressions/
 
 # Recreate your dfm from your toks object
 cr_dfm2 <- dfm(cr_toks2)
+cr_dfm2
 
 # Add those bigrams/ngrams to your dfm_select or dfm_lookup workflow
 dfm_keywords2 <- dfm_select(cr_dfm2, pattern = c("minimum_wage","economic","worker","taxpayer","consumer"), 
@@ -131,6 +145,8 @@ View(dfm_keywords2)
 
 # Note that you can add a tokens_replace function upstream in the GloVe word embeddings
 # workflow if you want to generate synonyms for a multi-word phrase
+
+
 
 ########################### KEYWORDS IN CONTEXT (KWIC) ###########################
 # https://quanteda.io/reference/kwic.html
@@ -147,15 +163,17 @@ View(dfm_keywords2)
 economic <- kwic(cr_corpus, pattern = "economic",
                  window = 10, valuetype = "fixed")
 
-# Turn your kwic object into a dataframe
+# Turn your kwic object into a dataframe (key words in context)
 economic <- as.data.frame(economic)
 
 # Look at it
 View(economic)
 
+
 # Wildcard lookup
 econ <- kwic(cr_corpus, pattern = "econ*", 
                    window = 10, valuetype = "glob")
+
 
 # Turn your kwic object into a dataframe
 econ <- as.data.frame(econ)
@@ -163,12 +181,13 @@ econ <- as.data.frame(econ)
 # Look at it
 View(econ)
 
-# Phrase lookup
+# Phrase look-up
 minimum_wage <- kwic(cr_corpus, pattern = phrase("minimum wage"), 
-                    window = 10, valuetype = "glob")
+                    window = 10)      
 
-# Turn your kwic object into a dataframe
-minimum_wage <- as.data.frame(minimum_wage)
+minimum_wage <- as.data.frame(kwic(cr_corpus, pattern = phrase("minimum wage"), 
+                     window = 10))      
+
 
 # Look at it
 View(minimum_wage)
@@ -185,9 +204,14 @@ View(minimum_wage)
 # Turn it into a corpus; tell the corpus command where the text is
 # Note: each row is a kwic extract, not a Cong. Rec. document
 kwic_corpus <- corpus(minimum_wage, text = "pre_post")
+View(kwic_corpus)
+
 
 # Tokenize
 kwic_toks <- tokens(kwic_corpus)
+View(kwic_toks)
+
+
 
 ########################### READABILITY ###########################
 # https://quanteda.io/reference/textstat_readability.html
@@ -199,6 +223,7 @@ kwic_toks <- tokens(kwic_corpus)
 # https://en.wikipedia.org/wiki/Readability
 
 # Think about the size of your kwic window. Is it large enough?
+# Measures are all diff. 
 
 kwic_read <- textstat_readability(kwic_corpus, measure = "Flesch.Kincaid")
 kwic_read
@@ -208,15 +233,19 @@ kwic_read <- textstat_readability(kwic_corpus, measure = c("Flesch.Kincaid", "Da
 kwic_read
 
 # Add the document identifier and text columns back in
+# Cbind does not do an inner join. Your primary key in your two dataframes need to match.
 kwic_read <- cbind(minimum_wage$docname, minimum_wage$pre_post, kwic_read)
+kwic_read
 
-# Clean up
+# Clean up (Delete column)
 kwic_read$document <- NULL
 
 View(kwic_read)
 
 ########################### LEXICAL DIVERSITY ###########################
 # https://tutorials.quanteda.io/statistical-analysis/lexdiv/
+# How many unique tokens are used in that document divided by total tokens
+# Not cleaning because it will drop out lexical diversity.
 
 # Think about the size of your kwic window. Is it large enough?
 
@@ -246,14 +275,17 @@ View(kwic_lexdiv)
 data_dictionary_LSD2015
 
 # Compound neg_negative and neg_positive tokens before creating a dfm object
+# Function knows something is a bigram.
 kwic_toks_compound <- tokens_compound(kwic_toks, data_dictionary_LSD2015)
 
+# Using dfm_lookup function to compare to a dictionary of sentiment.
 kwic_sentiment <- dfm_lookup(dfm(kwic_toks_compound), data_dictionary_LSD2015)
 
 View(kwic_sentiment)
 
 # Convert kwic_sentiment to a dataframe
 kwic_sentiment <- convert(kwic_sentiment, to = "data.frame")
+
 
 # Add the document identifier column back in
 kwic_sentiment <- cbind(minimum_wage$docname, kwic_sentiment)
@@ -265,8 +297,9 @@ View(kwic_sentiment)
 ## OPTION 2: SENTIMENTR
 # https://github.com/trinker/sentimentr
 # https://towardsdatascience.com/doing-your-first-sentiment-analysis-in-r-with-sentimentr-167855445132
-
 # Uses Jockers(2017) dictionary: https://github.com/mjockers/syuzhet --> incorporates Syuzhet, Bing, AFINN, and NRC lexicons
+
+
 
 # Input is a data frame with text column identified
 kwic_sentimentr <- sentiment_by(minimum_wage$pre_post)
