@@ -51,13 +51,16 @@ cr.txt <- readtext("crec*")
 en.sw <- stopwords("en")
 nlra.ascii <- replace_non_ascii(nlra.txt, replacement="", remove.nonconverted=TRUE)
 nlra.corpus <- corpus(nlra.ascii)
+
 nlra.tk.1gram <- tokens_wordstem(
                  tokens_select(
                  tokens(nlra.corpus, remove_punct=TRUE,
                         remove_symbols=TRUE, remove_numbers=TRUE),
                         pattern=en.sw, selection="remove")
                  )
+
 nlra.tk.2gram <- tokens_ngrams(nlra.tk.1gram, n=2)
+
 
 # Get 1 Gram Dfm
 nlra.1gram.dfm <- dfm(nlra.tk.1gram)
