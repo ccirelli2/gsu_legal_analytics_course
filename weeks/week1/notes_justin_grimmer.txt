@@ -1,0 +1,88 @@
+Paper :	Text as Data: The Promise and Pitfalls of Automatic Content
+	Analytis Methods for Polital Texts.
+
+Author : Justin Grimmer
+
+
+Topic : Automated text analysis. 
+	Argue that it makes practical analysing large bodies of text.
+	For these methods to become standard tools for political
+	scientists methdologists must contribute new moethods and means
+	of validation.
+
+Questions:
+- Data generating process to produce texts?
+
+
+Intro :
+	Analyzing massive collections of text has been essentially impossible
+	for all but the most well-funded projects.
+	Automated text analysis makes this possible without massive funding
+	support.
+	Do not believe automated methods will replace human analysis. Automated
+	methods incorrect models of language.
+	Methods - classification and scaling.  
+
+	Classification
+	1. Midex Membershi Models - problem specific structure to assist in the
+		estimation of categories.
+	2. Computer Assisted Clustering - provides methods to explore thousands of
+	potential clusterins.  
+
+	Scaling:
+	- estimate location of actors in policy space or produce 'scaling'
+	1. Word Scores: relies on guidance from ref texts to situate other
+		political actors in a space.
+	2. Word Fish : exploits an assumption about how ideology affects word usage.
+		Sounds like they use models to assign actors to a particular polical
+		group based on the words that they use.
+	
+	Four Principles of Automated Text Analysis
+	1.) All Quantitative Models of Language Are Wrong - But Some Are Useful
+		- The goal of building text models is diff than model building to
+		make causal inferences, which is the primary goal of most political
+		science models.
+		*It appears that the authors believe text analysis should be used
+		for categorizing texts and other sort of meanial tasks, but not
+		for interpreting the meaning of the text itself.
+
+	2.) Quantitative Methods Augment Humans - Not Replace Them
+		- The most productive line of inquiry is to identify the best way
+		to use both humans and automated moethods for analysing texts.
+
+	3.) There is not global best method for automating text analysis
+		- Each research question may require a separate and or unique
+		model.
+		- Believe that the most import lines of inquiry is identifying eff
+		ways to combine distinct methods for quantitative text analysis.
+	
+	4.) Validate, Validate, Validate
+		- Authors contend that even with unsupervised learning models there
+		should be a validation set or means to validate the accuracy of the
+		model.
+
+
+	Language Complexity: From Words to Numbers
+	- Authors present how to transform text into quantitative data.
+	- Unit of analysis will be the text or document.
+	- Collection of texts as corpus and collection of corus as corpora.
+	- Note:  When this paper was being written they were still using the bag of words
+	method which disgards the ordering of the words. 
+
+	
+	Methods :
+
+	1.) Dictionary Methods:
+		- key value pairs where the key is a word or the tone of a word and the value
+		is the count.
+		- Authors contend that we should be very careful to use off the shelf dict that
+		are not particular to the context of the body of text to be analized, ex financial
+		statement analysis. 
+
+
+	Continue: Discovering Categories & Topics
+
+
+
+
+
