@@ -11,7 +11,7 @@
 ##### Part 1 - Setup #####
 
 # Import the stringr package
-# install.packages("tidyverse")
+install.packages("tidyverse")
 library(stringr)
 
 # Arbitrary example placeholder texts.
@@ -76,14 +76,14 @@ str_view_all(
 
 str_view_all(
   string = texts,
-  pattern = "???"
+  pattern = "Dr. Who"
 )
 
 # Edit and run the code below in such a way that the phrase
 # "intend to" is highlighted in the appropriate text.
 str_view_all(
   string = texts,
-  pattern = "???"
+  pattern = "intend to"
 )
 
 
@@ -157,10 +157,10 @@ str_view_all(
 
 # You will need to uncomment the next few lines of code.
 
-# str_view_all(
-#   string = texts,
-#   pattern = ???( "the state" , ??? = ???)
-# )
+str_view_all(
+   string = texts,
+   pattern = regex( "the state" , ignore_case = TRUE)
+   )
 
 
 
@@ -188,7 +188,7 @@ str_view_all(
 
 str_view_all(
   string = texts,
-  pattern = regex( "death." , ignore_case = TRUE)
+  pattern = regex( "death.*" , ignore_case = TRUE)
 )
 
 # And by multiple characters
@@ -299,7 +299,7 @@ str_view_all(
 # Attempt to identify all digits individually
 str_view_all(
   string = texts,
-  pattern = regex( "\\d" , ignore_case = TRUE)
+  pattern = regex( "\\d./" , ignore_case = TRUE)
 )
 
 
@@ -362,12 +362,12 @@ str_view_all(
 
 str_view_all(
   string = texts,
-  pattern = regex( "???????????" , ignore_case = TRUE)
+  pattern = regex( "The State\\s+(\\w+\\s+){3}" , ignore_case = TRUE)
 )
 
 
 
-#########################################
++#########################################
 ##### Part 5 - Positional arguments #####
 # Cheat sheet: see "ANCHORS" and "LOOKAROUNDS"
 
