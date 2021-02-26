@@ -5,6 +5,8 @@ __pycache__/
 
 # Project specific
 *.csv
+*.txt
+
 
 # C extensions
 *.so

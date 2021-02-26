@@ -33,8 +33,9 @@ library(ggplot2)
 ################################################################################
 dir_base = 'C:\\Users\\chris.cirelli\\Desktop\\repositories\\gsu_legal_analytics_course'
 dir_data = file.path(dir_base, '\\data')
+dir_crec = file.path(dir_data, '\\crec\\2018_2020_txt')
 dir_hw = file.path(dir_base, '\\hw\\hw4')
-setwd(dir_hw)
+
 
 
 ################################################################################
@@ -44,42 +45,43 @@ setwd(dir_hw)
 # Nlra Text
 nlra.txt <- readtext(paste0(dir_data, "\\nlra.txt"))
 setwd(dir_data)
-cr.txt <- readtext("crec*")
 
-# Congression Text
+# Congressional Texts
+setwd(dir_crec)
+cr.txt <- readtext("*.txt")
+cr.txt <- cr.txt$text
 
 
 ################################################################################
 # 1.) Get Tokens of Interest
 ################################################################################
 en.sw <- stopwords("en")
-nlra.ascii <- replace_non_ascii(nlra.txt, replacement="", remove.nonconverted=TRUE)
-nlra.corpus <- corpus(nlra.ascii)
+cr.ascii <- replace_non_ascii(cr.txt, replacement="", remove.nonconverted=TRUE)
+cr.corpus <- corpus(cr.ascii)
 
-nlra.tk.1gram <- tokens_wordstem(
+cr.tk.1gram <- tokens_wordstem(
                  tokens_select(
-                 tokens(nlra.corpus, remove_punct=TRUE,
+                 tokens(cr.corpus, remove_punct=TRUE,
                         remove_symbols=TRUE, remove_numbers=TRUE),
                         pattern=en.sw, selection="remove")
                  )
 
-nlra.tk.2gram <- tokens_ngrams(nlra.tk.1gram, n=2)
-
+cr.tk.2gram <- tokens_ngrams(cr.tk.1gram, n=2)
 
 # Get 1 Gram Dfm
-nlra.1gram.dfm <- dfm(nlra.tk.1gram)
-nlra.tf.1gram <- textstat_frequency(nlra.1gram.dfm)
-head(nlra.tf.1gram, n=100)
-ggplot(nlra.tf.1gram[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
+cr.1gram.dfm <- dfm(cr.tk.1gram)
+cr.tf.1gram <- textstat_frequency(cr.1gram.dfm)
+head(cr.tf.1gram, n=200)
+ggplot(cr.tf.1gram[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
   geom_point() + coord_flip() + labs(x = NULL, y = "Frequency")
 tk.of.int.1gram <- c('labor', 'employe', 'employ', 'board', 'servic', 'unfair',
                'collect', 'concili', 'right')
 # Get Bi-Gram Dfm
-nlra.2gram.dfm <- dfm(nlra.tk.2gram)
-nlra.tf.2gram <- textstat_frequency(nlra.2gram.dfm)
-head(nlra.tf.2gram, n=100)
-nlra.tf.2gram$feature[1:100]
-ggplot(nlra.tf.2gram[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
+cr.2gram.dfm <- dfm(cr.tk.2gram)
+cr.tf.2gram <- textstat_frequency(cr.2gram.dfm)
+head(cr.tf.2gram, n=100)
+cr.tf.2gram$feature[1:100]
+ggplot(cr.tf.2gram[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
   geom_point() + coord_flip() + labs(x = NULL, y = "Frequency")
 tk.of.int.2gram <- c('labor_organ', 'unfair_labor', 'labor_practic',
                      'repres_employe', 'labor_disput', 'collect_bargain',
@@ -92,7 +94,7 @@ tk.of.int.2gram <- c('labor_organ', 'unfair_labor', 'labor_practic',
 cr.corpus = corpus(cr.txt)
 cr.tk.1gram <- tokens_wordstem(
                tokens_select(
-               tokens(nlra.corpus, remove_punct=TRUE,
+               tokens(cr.corpus, remove_punct=TRUE,
                remove_symbols=TRUE, remove_numbers=TRUE),
                pattern=en.sw, selection="remove")
                )
@@ -111,27 +113,51 @@ cr.tf.1gram
 cr.tf.2gram
 
 
+# Frequency Co-occurance Matrix
+fcm <- fcm(cr.tk.1gram, 
+           context = "window", 
+           count = "weighted", 
+           weights = 1 / (1:5), 
+           tri = TRUE)
+# Glove Word Embedding
+glove <- GlobalVectors$new(rank = 50, x_max = 10)
+# Apply model to fcm
+fcm_tokens <- glove$fit_transform(fcm, n_iter = 20)
+fcm_tokens
+# Create list of N most similar words
+## Create function for finding list of the N most similar terms
+most_similar = function(x,y,method="cosine",N=10)
+{
+  most_sim=head(sort(
+    sim2(x, x[y, , drop=FALSE], 
+         method=method)[,1], decreasing=TRUE), N)
+  return(list(top_words=most_sim))
+}
+most_similar(fcm_tokens, "prayer")
+
+
 ################################################################################
 # 3.) Use the kwic function to extract a text window around one of your key
 ################################################################################
 
-labor <- as.data.frame(kwic(cr.corpus, pattern='labor', window=10))
-labor.pre.post <- paste(labor$pre, labor$post)
-labor.corpus <- corpus(labor.pre.post)
-labor.tk <- tokens_wordstem(
+prayer <- as.data.frame(kwic(cr.corpus, pattern='prayer', window=10))
+prayer.pre.post <- paste(prayer$pre, prayer$post)
+prayer.corpus <- corpus(prayer.pre.post)
+prayer.corpus
+prayer.tk <- tokens_wordstem(
              tokens_select(
-             tokens(labor.pre.post, remove_punct=TRUE,
+             tokens(prayer.pre.post, remove_punct=TRUE,
              remove_symbols=TRUE, remove_numbers=TRUE),
              pattern=en.sw, selection="remove"))
-labor.tk.dfm = dfm(labor.tk)
-labor.tf <- textstat_frequency(labor.tk.dfm)
-ggplot(labor.tf[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
+prayer.tk.dfm = dfm(prayer.tk)
+prayer.tf <- textstat_frequency(prayer.tk.dfm)
+ggplot(prayer.tf[1:20, ], aes(x = reorder(feature, frequency), y = frequency)) +
   geom_point() + coord_flip() + labs(x = NULL, y = "Frequency")
 
 ################################################################################
 # 4.) Sentiment Analysis
 ################################################################################
-kwic.setiment <- as.data.frame(dfm_lookup(labor.tk.dfm, data_dictionary_LSD2015))
+kwic.setiment <- as.data.frame(dfm_lookup(prayer.tk.dfm, data_dictionary_LSD2015))
 View(kwic.setiment)
 
 neg.sum <- sum(kwic.setiment$negative)
@@ -142,8 +168,8 @@ pos.sum
 
 'Comments
   Based on the sum of the positive and negative sentences that contained the
-  term "labor" it would appear that for this particular coprus the sentiment
-  was largely positive (>2x more positive terms than negative)
+  term "prayer" it would appear that for this particular coprus the sentiment
+  was largely positive
 
 '
 
