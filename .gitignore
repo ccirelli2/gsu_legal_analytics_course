@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 # Project specific
-
+*.csv
 *.txt
 *.Rhistory
 *.mp4
