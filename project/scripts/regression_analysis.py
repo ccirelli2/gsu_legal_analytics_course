@@ -10,10 +10,21 @@ import numpy as np
 import warnings
 import matplotlib.pyplot as plt
 import seaborn as sns
+from collections import Counter
+
 
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from statsmodels.graphics.gofplots import qqplot
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import export_graphviz
+from sklearn.metrics import r2_score
+from scipy.stats import pearsonr
+
+
+import pydot
 
 ###############################################################################
 # Library Settings
@@ -52,35 +63,21 @@ logging.info(f'Data dimensions => {data.shape}')
 ###############################################################################
 # Declare Variables By DataType
 ###############################################################################
-CATCOLS=['chamber', 'state', 'gender', 'party']
+CATCOLS=['chamber', 'state', 'gender', 'party', 'keyword']
 CONTCOLS=['AverageNetWorth']
+FEATURES=CATCOLS+CONTCOLS
 TARGET=['sent_score']
-
+ROOTKEYWORDS=['wages', 'overtime', 'workweek']
 
 ###############################################################################
 # Data Transformation 
 ###############################################################################
 
-# Add flag wage & hour text
-data['wnh_flag'] = list(map(lambda x: 1 if isinstance(x, str) else 0,
-                            data['prepost_txt'].values))
-logging.info(f"Number of wage & hour rows => {data['wnh_flag'].sum()}")
-
-# Limit Data to Wage & Hour
-data_wnh = data[data['wnh_flag']==1]
-
-# Convert negative_wnh_txt score to negative
-data_wnh.loc[:, 'negative_wnh_txt'] = [
-        x * -1 for x in data_wnh['negative_wnh_txt'].values]
-
-# Concat First & Last Name
-data_wnh['firstlastname'] = np.add(
-        data_wnh.loc[:, 'firstname'].values,
-        data_wnh.loc[:, 'lastname'].values)
+# Basic data cleaning
+data_wnh = m1.data_transform(data)
 
 # Group By First & Last Name 
-d_grouped = data_wnh.groupby([
-            'firstlastname', 'chamber', 'state', 'gender', 'party'])[
+d_grouped = data_wnh.groupby(CATCOLS)[
                 'AverageNetWorth', 'negative_wnh_txt',
                 'positive_wnh_txt'].mean()
 d_grouped.reset_index(inplace=True)
@@ -97,6 +94,8 @@ for col in nan_cols:
 logging.info(f'Dimensions prior to dummies => {d_grouped.shape}')
 d_grouped = pd.get_dummies(d_grouped, columns=CATCOLS)
 logging.info(f'Dimensions after to dummies => {d_grouped.shape}')
+
+# Redefine Feature Variables Include Dummies
 FEATURES=[x for x in d_grouped.columns if x not in ['firstlastname',
     'negative_wnh_txt', 'positive_wnh_txt', 'sent_score']]
 
@@ -112,30 +111,33 @@ d_grouped['sent_score'] = np.add(
 ###############################################################################
 # EDA Independent & Dependent Variables 
 ###############################################################################
-#m1.plot_hist(d_grouped, 'sent_score', True, dir_output)
-#m1.plot_hist(d_grouped, 'AverageNetWorth', True, dir_output)
 """
+m1.plot_hist(d_grouped, 'sent_score', True, dir_output)
+m1.plot_hist(d_grouped, 'AverageNetWorth', True, dir_output)
 m1.sms_qqplot(data=d_grouped, var_name='AverageNetWorth',
         logx=True, title="QQPlot Log AvgNetWorth",
         savefig=True, dir_output=dir_output)
 """
 
 ###############################################################################
-# Fit Models 
+# Fit OLS Model 
 ###############################################################################
-   
-"""
+"""  
 m1.OLS(d_grouped, logx=True,
-        x_vars=['AverageNetWorth', 'chamber_H', 'chamber_S',
-            'party_D', 'party_R'], reg=True,
-        title='OLS Sent on Log NetWorth Top Features - Lasso',
+        x_vars=FEATURES, reg=True,
+        title='OLS Sent on Log NetWorth All Features - Lasso',
         dir_output=dir_output)
 """
 
+###############################################################################
+# Fit Random Forest Model 
+###############################################################################
+
+m1.fit_rf(d_grouped, FEATURES, TARGET, shap=False)
 
 
 ###############################################################################
-# Results
+# Log Results 
 ###############################################################################
 
 
@@ -280,88 +282,92 @@ Kurtosis:                       4.965   Cond. No.                     1.37e+17
 
 # Sent Score - Lasso
 """
-OLS Regression Results                            
+ OLS Regression Results                            
 ==============================================================================
-Dep. Variable:             sent_score   R-squared:                       0.009
-Model:                            OLS   Adj. R-squared:                  0.004
-Method:                 Least Squares   F-statistic:                     1.308
-Date:                Sat, 10 Apr 2021   Prob (F-statistic):              0.271
-Time:                        10:21:10   Log-Likelihood:                -1268.5
-No. Observations:                 442   AIC:                             2545.
-Df Residuals:                     439   BIC:                             2561.
-Df Model:                           3                                         
+Dep. Variable:             sent_score   R-squared:                       0.022
+Model:                            OLS   Adj. R-squared:                  0.014
+Method:                 Least Squares   F-statistic:                     2.015
+Date:                Sat, 10 Apr 2021   Prob (F-statistic):             0.0918
+Time:                        19:27:34   Log-Likelihood:                -1002.5
+No. Observations:                 359   AIC:                             2015.
+Df Residuals:                     355   BIC:                             2034.
+Df Model:                           4                                         
 Covariance Type:            nonrobust                                         
-===================================================================================
-                      coef    std err          t      P>|t|      [0.025      0.975]
------------------------------------------------------------------------------------
-AverageNetWorth     0.1830      0.021      8.749      0.000       0.142       0.224
-chamber_H                0          0        nan        nan           0           0
-chamber_S           0.5992      0.468      1.280      0.201      -0.321       1.519
-state_AK                 0          0        nan        nan           0           0
-state_AL                 0          0        nan        nan           0           0
-state_AR                 0          0        nan        nan           0           0
-state_AS                 0          0        nan        nan           0           0
-state_AZ                 0          0        nan        nan           0           0
-state_CA                 0          0        nan        nan           0           0
-state_CO                 0          0        nan        nan           0           0
-state_CT                 0          0        nan        nan           0           0
-state_DC                 0          0        nan        nan           0           0
-state_DE                 0          0        nan        nan           0           0
-state_FL                 0          0        nan        nan           0           0
-state_GA                 0          0        nan        nan           0           0
-state_HI                 0          0        nan        nan           0           0
-state_IA                 0          0        nan        nan           0           0
-state_ID                 0          0        nan        nan           0           0
-state_IL                 0          0        nan        nan           0           0
-state_IN                 0          0        nan        nan           0           0
-state_KS                 0          0        nan        nan           0           0
-state_KY                 0          0        nan        nan           0           0
-state_LA                 0          0        nan        nan           0           0
-state_MA                 0          0        nan        nan           0           0
-state_MD                 0          0        nan        nan           0           0
-state_ME                 0          0        nan        nan           0           0
-state_MI                 0          0        nan        nan           0           0
-state_MN                 0          0        nan        nan           0           0
-state_MO                 0          0        nan        nan           0           0
-state_MP                 0          0        nan        nan           0           0
-state_MS                 0          0        nan        nan           0           0
-state_MT                 0          0        nan        nan           0           0
-state_NC                 0          0        nan        nan           0           0
-state_ND                 0          0        nan        nan           0           0
-state_NE                 0          0        nan        nan           0           0
-state_NH                 0          0        nan        nan           0           0
-state_NJ                 0          0        nan        nan           0           0
-state_NM                 0          0        nan        nan           0           0
-state_NV                 0          0        nan        nan           0           0
-state_NY                 0          0        nan        nan           0           0
-state_OH                 0          0        nan        nan           0           0
-state_OK                 0          0        nan        nan           0           0
-state_OR                 0          0        nan        nan           0           0
-state_PA                 0          0        nan        nan           0           0
-state_RI                 0          0        nan        nan           0           0
-state_SC                 0          0        nan        nan           0           0
-state_SD                 0          0        nan        nan           0           0
-state_TN                 0          0        nan        nan           0           0
-state_TX                 0          0        nan        nan           0           0
-state_UT                 0          0        nan        nan           0           0
-state_VA                 0          0        nan        nan           0           0
-state_VI                 0          0        nan        nan           0           0
-state_VT                 0          0        nan        nan           0           0
-state_WA                 0          0        nan        nan           0           0
-state_WI                 0          0        nan        nan           0           0
-state_WV                 0          0        nan        nan           0           0
-state_WY                 0          0        nan        nan           0           0
-gender_F                 0          0        nan        nan           0           0
-gender_M                 0          0        nan        nan           0           0
-party_D             0.7888      0.401      1.965      0.050      -0.000       1.578
-party_I                  0          0        nan        nan           0           0
-party_R                  0          0        nan        nan           0           0
+====================================================================================
+                       coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------------
+AverageNetWorth      0.2043      0.025      8.186      0.000       0.155       0.253
+chamber_H            0.6050      0.417      1.452      0.147      -0.214       1.424
+chamber_S                 0          0        nan        nan           0           0
+state_AK                  0          0        nan        nan           0           0
+state_AL                  0          0        nan        nan           0           0
+state_AR                  0          0        nan        nan           0           0
+state_AS                  0          0        nan        nan           0           0
+state_AZ                  0          0        nan        nan           0           0
+state_CA                  0          0        nan        nan           0           0
+state_CO                  0          0        nan        nan           0           0
+state_CT                  0          0        nan        nan           0           0
+state_DC                  0          0        nan        nan           0           0
+state_DE                  0          0        nan        nan           0           0
+state_FL                  0          0        nan        nan           0           0
+state_GA                  0          0        nan        nan           0           0
+state_HI                  0          0        nan        nan           0           0
+state_IA                  0          0        nan        nan           0           0
+state_ID                  0          0        nan        nan           0           0
+state_IL                  0          0        nan        nan           0           0
+state_IN                  0          0        nan        nan           0           0
+state_KS                  0          0        nan        nan           0           0
+state_KY                  0          0        nan        nan           0           0
+state_LA                  0          0        nan        nan           0           0
+state_MA                  0          0        nan        nan           0           0
+state_MD                  0          0        nan        nan           0           0
+state_ME                  0          0        nan        nan           0           0
+state_MI                  0          0        nan        nan           0           0
+state_MN                  0          0        nan        nan           0           0
+state_MO                  0          0        nan        nan           0           0
+state_MP                  0          0        nan        nan           0           0
+state_MS                  0          0        nan        nan           0           0
+state_MT                  0          0        nan        nan           0           0
+state_NC                  0          0        nan        nan           0           0
+state_ND                  0          0        nan        nan           0           0
+state_NE                  0          0        nan        nan           0           0
+state_NH                  0          0        nan        nan           0           0
+state_NJ                  0          0        nan        nan           0           0
+state_NM                  0          0        nan        nan           0           0
+state_NV                  0          0        nan        nan           0           0
+state_NY                  0          0        nan        nan           0           0
+state_OH                  0          0        nan        nan           0           0
+state_OK                  0          0        nan        nan           0           0
+state_OR                  0          0        nan        nan           0           0
+state_PA                  0          0        nan        nan           0           0
+state_RI                  0          0        nan        nan           0           0
+state_SC                  0          0        nan        nan           0           0
+state_SD                  0          0        nan        nan           0           0
+state_TN                  0          0        nan        nan           0           0
+state_TX                  0          0        nan        nan           0           0
+state_UT                  0          0        nan        nan           0           0
+state_VA                  0          0        nan        nan           0           0
+state_VI                  0          0        nan        nan           0           0
+state_VT                  0          0        nan        nan           0           0
+state_WA                  0          0        nan        nan           0           0
+state_WI                  0          0        nan        nan           0           0
+state_WV                  0          0        nan        nan           0           0
+state_WY                  0          0        nan        nan           0           0
+gender_F                  0          0        nan        nan           0           0
+gender_M                  0          0        nan        nan           0           0
+party_D                   0          0        nan        nan           0           0
+party_I                   0          0        nan        nan           0           0
+party_R                   0          0        nan        nan           0           0
+keyword_overtime     0.4883      0.471      1.037      0.301      -0.438       1.415
+keyword_wages             0          0        nan        nan           0           0
+keyword_workweek    -1.0685      0.562     -1.901      0.058      -2.174       0.037
 ==============================================================================
-Omnibus:                       24.745   Durbin-Watson:                   2.117
-Prob(Omnibus):                  0.000   Jarque-Bera (JB):               76.158
-Skew:                          -0.076   Prob(JB):                     2.90e-17
-Kurtosis:                       5.028   Cond. No.                          nan
+Omnibus:                       45.195   Durbin-Watson:                   1.968
+Prob(Omnibus):                  0.000   Jarque-Bera (JB):              225.214
+Skew:                           0.353   Prob(JB):                     1.25e-49
+Kurtosis:                       6.816   Cond. No.                          nan
 ==============================================================================
+
 
 """
 
