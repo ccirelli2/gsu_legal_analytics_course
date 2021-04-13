@@ -79,11 +79,6 @@ def data_transform(data):
     return data_wnh
 
 
-
-
-
-
-                                                              
 def fit_rf(data, FEATURES, TARGET, shap):                                        
     # Subset dataset                                                            
     data = data[FEATURES + TARGET]                                              

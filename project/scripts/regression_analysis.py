@@ -23,6 +23,9 @@ from sklearn.tree import export_graphviz
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
 
+import statsmodels.formula.api as smf
+
+
 
 import pydot
 
@@ -107,6 +110,11 @@ d_grouped['sent_score'] = np.add(
         d_grouped.loc[:, 'negative_wnh_txt'].values,
         d_grouped.loc[:, 'positive_wnh_txt'].values)
 
+# Pearson Correlation
+sent_corr = d_grouped['sent_score'].values
+avgnetworth = d_grouped['AverageNetWorth'].values
+pearson_coef = pearsonr(sent_corr, avgnetworth)
+
 
 ###############################################################################
 # EDA Independent & Dependent Variables 
@@ -122,18 +130,39 @@ m1.sms_qqplot(data=d_grouped, var_name='AverageNetWorth',
 ###############################################################################
 # Fit OLS Model 
 ###############################################################################
-"""  
+  
 m1.OLS(d_grouped, logx=True,
         x_vars=FEATURES, reg=True,
         title='OLS Sent on Log NetWorth All Features - Lasso',
         dir_output=dir_output)
-"""
+
+
+###############################################################################
+# Fit OLS Model 
+###############################################################################
+
+def reg_poly(data, degree):
+    # Convert AvgNetWorth Log
+    data = data[data['AverageNetWorth'] > 0]
+    data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
+
+    x = data['AverageNetWorth'].values
+    y = data['sent_score'].values
+    
+    model = f'sent_score ~ AverageNetWorth + I(AverageNetWorth**{degree})'
+    model_fit = smf.ols(formula = model, data = data).fit()
+    
+    print('###########################################')
+    print(model_fit.summary())
+
+
+#reg_poly(d_grouped, degree=3)
 
 ###############################################################################
 # Fit Random Forest Model 
 ###############################################################################
 
-m1.fit_rf(d_grouped, FEATURES, TARGET, shap=False)
+#m1.fit_rf(d_grouped, FEATURES, TARGET, shap=False)
 
 
 ###############################################################################
