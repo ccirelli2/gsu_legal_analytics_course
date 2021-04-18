@@ -31,7 +31,7 @@ import pydot
 import shap
 
 ###############################################################################
-# Functions 
+# Functions - Data Transformation
 ###############################################################################
 
 def data_transform(data):
@@ -78,6 +78,103 @@ def data_transform(data):
     # Return transformed data
     return data_wnh
 
+def group_data(data, catcols, contcols, how):                                    
+    """                                                                         
+    Function to group data with and without the keywords as covariates.         
+                                                                                
+    Args:                                                                          
+        data: Ungrouped dataframe                                               
+        catcols: list of columns to include in group.                           
+        contcols: list of columns to take mean.                                  
+        how: with or without                                                    
+                                                                                
+    Returns:                                                                    
+        grouped data                                                            
+                                                                                
+    """
+    catcols_cp = catcols.copy()
+
+    # Group Data Without Key Words                                              
+    if how=='without':
+        catcols_cp.remove('keyword')                                               
+                                                                                
+    # Add concatenated name before group                                        
+    catcols_cp+=['firstlastname']                                                  
+                                                                                
+    # Return grouped data                                                       
+    return data.groupby(catcols_cp)['AverageNetWorth', 'negative_wnh_txt',         
+                'positive_wnh_txt'].mean().reset_index()    
+
+
+def impute_mean_nan(data, CONTCOLS):                                               
+    # Get Null Values By Feature                                                   
+    nans = data.isna().sum()                                                  
+    nan_cols = nans[nans.values > 0].index.tolist()                                
+    print(f'cols w/ null values => {nan_cols}')                           
+    # Iterate Columns w/ Null Values                                               
+    for col in nan_cols:                                                           
+        if col in CONTCOLS:                                                        
+            data[col].fillna(data[col].mean(), inplace=True)             
+    # Get remaining null columns                                                   
+    nans = data.isna().sum()                                                  
+    nan_cols = nans[nans.values > 0].index.tolist()                                
+    print(f'remaining cols w/ null values => {nan_cols}\n')                           
+    # Return data                                                                  
+    return data
+
+
+###############################################################################
+# Functions - Plots
+###############################################################################
+
+def plot_hist(data, var_name, title, savefig, dir_output):
+    plt.hist(data[var_name].values)          
+    plt.title(title)                          
+    if savefig:
+        path2file = os.path.join(dir_output, title.replace(' ', '_')) 
+        plt.savefig(path2file)
+    plt.show()                                                                  
+    plt.close()     
+
+
+def sms_reg_plot(results, title, savefig, dir_output):
+    fig, ax = plt.subplots(figsize=(15, 10))
+    plt.rcParams.update({'font.size':20})
+    fig = sm.graphics.plot_fit(results, 0, ax=ax)
+    ax.set_ylabel("Sentiment Score")
+    ax.set_xlabel("Average Net Worth")
+    ax.set_title(title)
+    if savefig:
+        path2file = os.path.join(dir_output, title.replace(' ', '_')) 
+        plt.savefig(path2file)
+    plt.show()
+    plt.close()
+
+def sms_qqplot(data, var_name, logx, title, savefig, dir_output):
+    
+    if logx:
+        # Subset data only positive networth
+        data = data[data['AverageNetWorth'] > 0]
+        # Log NetWorth
+        data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
+    
+    # Generate Plot
+    qqplot(data[var_name].values,
+            line="45")
+    plt.ylabel("Sentiment Score")
+    plt.xlabel("Average Net Worth")
+    plt.title(title)
+    if savefig:
+        path2file = os.path.join(dir_output, title.replace(' ', '_')) 
+        plt.savefig(path2file)
+    plt.show()
+    plt.close()
+
+
+
+###############################################################################
+# Functions - Models 
+###############################################################################
 
 def fit_rf(data, FEATURES, TARGET, shap):                                        
     # Subset dataset                                                            
@@ -161,48 +258,6 @@ def fit_rf(data, FEATURES, TARGET, shap):
 
 
 
-def plot_hist(data, var_name, title, savefig, dir_output):
-    plt.hist(data[var_name].values)          
-    plt.title(title)                          
-    if savefig:
-        path2file = os.path.join(dir_output, title.replace(' ', '_')) 
-        plt.savefig(path2file)
-    plt.show()                                                                  
-    plt.close()     
-
-
-def sms_reg_plot(results, title, savefig, dir_output):
-    fig, ax = plt.subplots(figsize=(15, 10))
-    plt.rcParams.update({'font.size':20})
-    fig = sm.graphics.plot_fit(results, 0, ax=ax)
-    ax.set_ylabel("Sentiment Score")
-    ax.set_xlabel("Average Net Worth")
-    ax.set_title(title)
-    if savefig:
-        path2file = os.path.join(dir_output, title.replace(' ', '_')) 
-        plt.savefig(path2file)
-    plt.show()
-    plt.close()
-
-def sms_qqplot(data, var_name, logx, title, savefig, dir_output):
-    
-    if logx:
-        # Subset data only positive networth
-        data = data[data['AverageNetWorth'] > 0]
-        # Log NetWorth
-        data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
-    
-    # Generate Plot
-    qqplot(data[var_name].values,
-            line="45")
-    plt.ylabel("Sentiment Score")
-    plt.xlabel("Average Net Worth")
-    plt.title(title)
-    if savefig:
-        path2file = os.path.join(dir_output, title.replace(' ', '_')) 
-        plt.savefig(path2file)
-    plt.show()
-    plt.close()
 
 
 def OLS(data, logx, x_vars, reg, title, dir_output):
@@ -234,7 +289,7 @@ def OLS(data, logx, x_vars, reg, title, dir_output):
     y = data['sent_score']
     model = sm.OLS(y, x)
 
-    # Fit Model
+    # Fit Model Normal & Regularized Regression Model
     if reg:
         results=model.fit_regularized(alpha=0.1,method='elastic_net',
                 L1_wt=1,refit=True)

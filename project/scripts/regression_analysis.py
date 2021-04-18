@@ -67,7 +67,7 @@ logging.info(f'Data dimensions => {data.shape}')
 # Declare Variables By DataType
 ###############################################################################
 CATCOLS=['chamber', 'state', 'gender', 'party', 'keyword']
-CONTCOLS=['AverageNetWorth']
+CONTCOLS=['AverageNetWorth', 'negative_wnh_txt', 'positive_wnh_txt']
 FEATURES=CATCOLS+CONTCOLS
 TARGET=['sent_score']
 ROOTKEYWORDS=['wages', 'overtime', 'workweek']
@@ -79,49 +79,69 @@ ROOTKEYWORDS=['wages', 'overtime', 'workweek']
 # Basic data cleaning
 data_wnh = m1.data_transform(data)
 
-# Group By First & Last Name 
-d_grouped = data_wnh.groupby(CATCOLS)[
-                'AverageNetWorth', 'negative_wnh_txt',
-                'positive_wnh_txt'].mean()
-d_grouped.reset_index(inplace=True)
+# Group Data W/out key words
+'''Note: Different key words were grouped to the same speaker, which
+         complicates grouping by speaker name to get average networth by
+         speaker.'''
+d_grouped_w=m1.group_data(data_wnh, CATCOLS, CONTCOLS, 'with')
+d_grouped_wout=m1.group_data(data_wnh, CATCOLS, CONTCOLS, 'without')
 
-# Get Null Values By Feature
-nans = d_grouped.isna().sum()
-nan_cols = nans[nans.values > 0].index.tolist()
-for col in nan_cols:
-    if col in CONTCOLS:
-        logging.info(f'Filling {col} nan values w/ mean')
-        d_grouped[col].fillna(d_grouped[col].mean(), inplace=True)
+# Imput Mean to Null Cols
+d_grouped_w=m1.impute_mean_nan(d_grouped_w, CONTCOLS)
+d_grouped_wout=m1.impute_mean_nan(d_grouped_wout, CONTCOLS)
+
 
 # Create Dummy Variables For Cat Features
-logging.info(f'Dimensions prior to dummies => {d_grouped.shape}')
-d_grouped = pd.get_dummies(d_grouped, columns=CATCOLS)
-logging.info(f'Dimensions after to dummies => {d_grouped.shape}')
+d_grouped_w = pd.get_dummies(d_grouped_w, columns=CATCOLS)
+d_grouped_wout = pd.get_dummies(d_grouped_w, columns=CATCOLS.copy().remove(
+    'keyword'))
 
 # Redefine Feature Variables Include Dummies
-FEATURES=[x for x in d_grouped.columns if x not in ['firstlastname',
+FEATURES_w=[x for x in d_grouped_w.columns if x not in ['firstlastname',
     'negative_wnh_txt', 'positive_wnh_txt', 'sent_score']]
-
+FEATURES_wout=[x for x in d_grouped_wout.columns if x not in ['firstlastname',
+    'negative_wnh_txt', 'positive_wnh_txt', 'sent_score']]
 
 ###############################################################################
 # Calculate Average Sentiment Score 
 ###############################################################################
-d_grouped['sent_score'] = np.add(
-        d_grouped.loc[:, 'negative_wnh_txt'].values,
-        d_grouped.loc[:, 'positive_wnh_txt'].values)
+
+d_grouped_w['sent_score'] = np.add(
+        d_grouped_w.loc[:, 'negative_wnh_txt'].values,
+        d_grouped_w.loc[:, 'positive_wnh_txt'].values)
+
+d_grouped_wout['sent_score'] = np.add(
+        d_grouped_wout.loc[:, 'negative_wnh_txt'].values,
+        d_grouped_wout.loc[:, 'positive_wnh_txt'].values)
 
 # Pearson Correlation
-sent_corr = d_grouped['sent_score'].values
-avgnetworth = d_grouped['AverageNetWorth'].values
-pearson_coef = pearsonr(sent_corr, avgnetworth)
+def get_pearson_corr(data, var1, var2):
+    v1 = data[var1].values
+    v2 = data[var2].values
+    pearson_coef = pearsonr(v1, v2)
 
+
+def get_scatter_plot(data, var1, var2, logx, savefig, dir_output):
+    
+    if logx:
+        print('data dim pre drop nans => {data.shape}')
+        data=data[var1, var2]
+        data.dropna(inplace=True, axis=1)
+        print('data dim post drop nans => {data.shape}')
+         
+    """
+    sns.scatterplot(d_grouped_wout['AverageNetWorth'].values,
+                d_grouped_wout['sent_score'].values)
+    plt.show()
+    plt.close()
+    """
 
 ###############################################################################
 # EDA Independent & Dependent Variables 
 ###############################################################################
 """
-m1.plot_hist(d_grouped, 'sent_score', True, dir_output)
-m1.plot_hist(d_grouped, 'AverageNetWorth', True, dir_output)
+m1.plot_hist(d_grouped, 'sent_score', 'Sentiment Score', True, dir_output)
+m1.plot_hist(d_grouped, 'AverageNetWorth', 'Average Net Worth', True, dir_output)
 m1.sms_qqplot(data=d_grouped, var_name='AverageNetWorth',
         logx=True, title="QQPlot Log AvgNetWorth",
         savefig=True, dir_output=dir_output)
@@ -130,12 +150,12 @@ m1.sms_qqplot(data=d_grouped, var_name='AverageNetWorth',
 ###############################################################################
 # Fit OLS Model 
 ###############################################################################
-  
+"""
 m1.OLS(d_grouped, logx=True,
         x_vars=FEATURES, reg=True,
         title='OLS Sent on Log NetWorth All Features - Lasso',
         dir_output=dir_output)
-
+"""
 
 ###############################################################################
 # Fit OLS Model 
