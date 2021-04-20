@@ -16,6 +16,8 @@ import seaborn as sns
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from statsmodels.graphics.gofplots import qqplot
+from scipy.stats import pearsonr
+
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
@@ -102,9 +104,14 @@ def group_data(data, catcols, contcols, how):
     catcols_cp+=['firstlastname']                                                  
                                                                                 
     # Return grouped data                                                       
-    return data.groupby(catcols_cp)['AverageNetWorth', 'negative_wnh_txt',         
+    d_grouped=data.groupby(catcols_cp)['AverageNetWorth', 'negative_wnh_txt',         
                 'positive_wnh_txt'].mean().reset_index()    
+    
+    # Remove Names Column
+    d_grouped.drop('firstlastname', inplace=True, axis=1)
 
+    # Return grouped data
+    return d_grouped
 
 def impute_mean_nan(data, CONTCOLS):                                               
     # Get Null Values By Feature                                                   
@@ -171,11 +178,220 @@ def sms_qqplot(data, var_name, logx, title, savefig, dir_output):
     plt.close()
 
 
+def get_scatter_plot(data, independent, dependent, gen_subgroup,
+        log_x, savefig, dir_output):      
+    
+    if log_x:                                                                   
+        # Drop nan values                                                       
+        print(f'data dim pre drop nans => {data.shape}')                        
+        data.dropna(inplace=True, axis=0)                                       
+        print(f'data dim post drop nans => {data.shape}')                       
+        # Drop Negative Values                                                  
+        data=data[data[independent] > 0]                                               
+        # Take Log of data                                                      
+        data[independent] = np.log(data[dependent].values)                                  
+
+
+    if gen_subgroup:
+        # Define SubGroup Columns
+        cols_subgroup=[x for x in data.columns if x not in [
+            'AverageNetWorth', 'sent_score']]
+        # Iterate column w/ subgroups
+        for subgroup in cols_subgroup:
+            # Subset data by subgroup
+            data_sub=data[data[subgroup]==1]
+            # Minimum Number of Observations
+
+            if data_sub.shape[0] > 2:
+                # Generate Scatter Plot
+                var1=data_sub[independent].values
+                var2=data_sub[dependent].values
+                sns.regplot(var1, var2)                                          
+                title='''Scatter Plot {} ~ {}, Subgroup => {},
+                         Log => {} Pearson =>'''.format(
+                        dependent, independent, subgroup, log_x)
+                plt.title(title)                                                            
+                plt.xlabel(var1)                                                            
+                plt.ylabel(var2)                                                            
+                if savefig:                                                                    
+                    path2file = os.path.join(dir_output, title.replace(' ', '_'))              
+                    plt.savefig(path2file)                                                     
+                plt.show()                                                                     
+                plt.close()   
+
+
+
+def regplot_by_subgroup(data, savefig, dir_output):
+    # Define features
+    features=[x for x in data.columns if x not in ['AverageNetWorth',
+        'sent_score', 'negative_wnh_txt', 'positive_wnh_txt']]
+
+    # Convert Independent Variable to Log
+    data = data[data['AverageNetWorth'] > 0]
+    data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
+    print(data.shape)
+    data['AverageNetWorth'].dropna(inplace=True, axis=0)
+    print(data.shape)
+    print('Features => {}'.format(features))
+    print('Data cols => {}'.format(data.columns))
+
+    # Iterate Subgroups
+    for col in features:
+        # SubSet Data
+        data_cp = data.copy()
+        subdata=data_cp[data_cp[col]==1]
+        print(f'Sub col {col} dimensions => {subdata.shape}')
+
+        if subdata.shape[0] > 2:
+            # Calculate 
+            corr=round(pearsonr(subdata['AverageNetWorth'].values,
+                subdata['sent_score'].values)[0], 2)
+            # Generate Plot
+            sns.regplot(subdata['AverageNetWorth'].values,
+                        subdata['sent_score'].values)
+            title=f'''Regression Plot - Sentiment on AvgNetWorth
+                      Sub Group {col} Corr {corr}'''
+            filename=f'regression_plot_sent_on_networth_subgroup_{col}'
+            plt.title(title)
+            plt.xlabel('AverageNetWorth')
+            plt.ylabel('Sentiment')
+            plt.tight_layout()
+            if savefig:
+                path2file = os.path.join(dir_output, 'scatter_plots', filename)
+                plt.savefig(path2file)
+            plt.show()
+            plt.close()
+
+
+
 
 ###############################################################################
 # Functions - Models 
 ###############################################################################
 
+
+def OLS(data, logx, x_vars, reg, title, dir_output):
+    """
+
+    Args:
+        data: DataFrame; contains training and target data
+        logx: Boolean; Take log of AverageNetWorth
+        x_vars: List; list of independent variables
+        title: Str; Title for plots
+        dir_output: Str; directory to write model results
+
+    """
+
+    # If Log of AvgNetWorth
+    if logx:
+        # Subset data only positive networth
+        logging.info(f'Logx True. Dimensions pre log => {data.shape}')
+        data = data[data['AverageNetWorth'] > 0]
+        logging.info(f'Dimensions post log => {data.shape}')
+        # Log NetWorth
+        data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
+
+
+    # Define Model
+    x = data['AverageNetWorth'].values.tolist()
+    y = data['sent_score'].values
+    model = sm.OLS(y, x)
+    
+    plt.scatter(x, y)
+    plt.show()
+    plt.close()
+
+    # Fit Model Normal & Regularized Regression Model
+    if reg:
+        results=model.fit_regularized(alpha=0.1,method='elastic_net',
+                L1_wt=1,refit=True)
+        #print(results.params)
+        print(results.summary())
+    else:
+        results=model.fit()
+        print(results.summary())
+    
+    # Plot OLS Rel
+    sms_reg_plot(results,
+            title=title,
+            savefig=True,
+            dir_output=dir_output)
+
+
+def OLS_feature_sub(data, logx, x_vars, sub_var, reg, title, dir_output):
+    """
+
+    Args:
+        data: DataFrame; contains training and target data
+        logx: Boolean; Take log of AverageNetWorth
+        x_vars: List; list of independent variables
+        title: Str; Title for plots
+        dir_output: Str; directory to write model results
+
+    """
+
+    # If Log of AvgNetWorth
+    if logx:
+        # Subset data only positive networth
+        logging.info(f'Logx True. Dimensions pre log => {data.shape}')
+        data = data[data['AverageNetWorth'] > 0]
+        logging.info(f'Dimensions post log => {data.shape}')
+        # Log NetWorth
+        data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
+
+    # Subset Data
+    data=data[data[sub_var]==1]
+
+    # Define Model
+    x = data[x_vars]
+    y = data['sent_score']
+    model = sm.OLS(y, x)
+    
+    # Fit Model Normal & Regularized Regression Model
+    if reg:
+        results=model.fit_regularized(alpha=0.1,method='elastic_net',
+                L1_wt=1,refit=True)
+        #print(results.params)
+        print(results.summary())
+    else:
+        results=model.fit()
+        print(results.summary())
+    
+    # Plot OLS Rel
+    sms_reg_plot(results,
+            title=title,
+            savefig=True,
+            dir_output=dir_output)
+
+
+def reg_poly(data, logx, degree):
+    # Convert AverageNetWorth Log Scale
+    if logx:
+        # Subset data only positive networth
+        logging.info(f'Logx True. Dimensions pre log => {data.shape}')
+        data = data[data['AverageNetWorth'] > 0]
+        logging.info(f'Dimensions post log => {data.shape}')
+        # Log NetWorth
+        data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
+    
+    # Polynomial
+    data['AverageNetWorth_poly'] = data['AverageNetWorth'].values **degree
+
+    x = data[['AverageNetWorth', 'AverageNetWorth_poly']].values
+    y = data['sent_score'].values
+    
+    model = sm.OLS(y, x)
+    result=model.fit() 
+    print(result.summary())
+    
+    # Plot OLS Rel
+    sms_reg_plot(results,
+            title=title,
+            savefig=True,
+            dir_output=dir_output)
+
+
+    
 def fit_rf(data, FEATURES, TARGET, shap):                                        
     # Subset dataset                                                            
     data = data[FEATURES + TARGET]                                              
@@ -255,59 +471,6 @@ def fit_rf(data, FEATURES, TARGET, shap):
     logging.info(f'MSE => {mse}')
     logging.info(f'R squared score => {r2}')                                    
     logging.info(f'Pearson corrcoef => {pearson[0]}')     
-
-
-
-
-
-def OLS(data, logx, x_vars, reg, title, dir_output):
-    """
-
-    Args:
-        data: DataFrame; contains training and target data
-        logx: Boolean; Take log of AverageNetWorth
-        x_vars: List; list of independent variables
-        title: Str; Title for plots
-        dir_output: Str; directory to write model results
-
-    """
-
-    # If Log of AvgNetWorth
-    if logx:
-        # Subset data only positive networth
-        logging.info(f'Logx True. Dimensions pre log => {data.shape}')
-        data = data[data['AverageNetWorth'] > 0]
-        logging.info(f'Dimensions post log => {data.shape}')
-        # Log NetWorth
-        data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
-
-    # Plot Distribution Scaled Variable
-    #m1.plot_hist(data, 'AverageNetWorth', title, True, dir_output) 
-
-    # Define Model
-    x = data[x_vars]
-    y = data['sent_score']
-    model = sm.OLS(y, x)
-
-    # Fit Model Normal & Regularized Regression Model
-    if reg:
-        results=model.fit_regularized(alpha=0.1,method='elastic_net',
-                L1_wt=1,refit=True)
-        #print(results.params)
-        print(results.summary())
-    else:
-        results=model.fit()
-        print(results.summary())
-    
-    # Plot OLS Rel
-    sms_reg_plot(results,
-            title=title,
-            savefig=True,
-            dir_output=dir_output)
-
-
-
-    
 
 
 

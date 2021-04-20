@@ -25,8 +25,6 @@ from scipy.stats import pearsonr
 
 import statsmodels.formula.api as smf
 
-
-
 import pydot
 
 ###############################################################################
@@ -41,10 +39,11 @@ warnings.filterwarnings('ignore')
 # Define Directories 
 ###############################################################################
 dir_repo = r'/home/cc2/Desktop/repositories/gsu_legal_analytics_course/project'
+dir_data=os.path.join(dir_repo, 'data')
 dir_scripts=os.path.join(dir_repo, 'scripts')
 dir_results=os.path.join(dir_repo, 'results')
 dir_eda=os.path.join(dir_results, 'eda')
-dir_output=os.path.join(dir_results, 'ols')
+dir_results_ols=os.path.join(dir_results, 'ols')
 
 [sys.path.append(x) for x in [dir_scripts, dir_results, dir_eda]]
 
@@ -93,7 +92,7 @@ d_grouped_wout=m1.impute_mean_nan(d_grouped_wout, CONTCOLS)
 
 # Create Dummy Variables For Cat Features
 d_grouped_w = pd.get_dummies(d_grouped_w, columns=CATCOLS)
-d_grouped_wout = pd.get_dummies(d_grouped_w, columns=CATCOLS.copy().remove(
+d_grouped_wout = pd.get_dummies(d_grouped_wout, columns=CATCOLS.copy().remove(
     'keyword'))
 
 # Redefine Feature Variables Include Dummies
@@ -106,13 +105,14 @@ FEATURES_wout=[x for x in d_grouped_wout.columns if x not in ['firstlastname',
 # Calculate Average Sentiment Score 
 ###############################################################################
 
+d_grouped_wout['sent_score'] = np.add(
+        d_grouped_wout.loc[:, 'negative_wnh_txt'].values,
+        d_grouped_wout.loc[:, 'positive_wnh_txt'].values)
+
 d_grouped_w['sent_score'] = np.add(
         d_grouped_w.loc[:, 'negative_wnh_txt'].values,
         d_grouped_w.loc[:, 'positive_wnh_txt'].values)
 
-d_grouped_wout['sent_score'] = np.add(
-        d_grouped_wout.loc[:, 'negative_wnh_txt'].values,
-        d_grouped_wout.loc[:, 'positive_wnh_txt'].values)
 
 # Pearson Correlation
 def get_pearson_corr(data, var1, var2):
@@ -120,21 +120,24 @@ def get_pearson_corr(data, var1, var2):
     v2 = data[var2].values
     pearson_coef = pearsonr(v1, v2)
 
+# Generate Scatter Plots
+"""
+m1.get_scatter_plot(d_grouped_wout, independent='AverageNetWorth',
+        dependent='sent_score', gen_subgroup=True, log_x=True,
+        savefig=True, dir_output=dir_results)
 
-def get_scatter_plot(data, var1, var2, logx, savefig, dir_output):
-    
-    if logx:
-        print('data dim pre drop nans => {data.shape}')
-        data=data[var1, var2]
-        data.dropna(inplace=True, axis=1)
-        print('data dim post drop nans => {data.shape}')
-         
-    """
-    sns.scatterplot(d_grouped_wout['AverageNetWorth'].values,
-                d_grouped_wout['sent_score'].values)
-    plt.show()
-    plt.close()
-    """
+m1.get_scatter_plot(d_grouped_wout, var1='AverageNetWorth', var2='sent_score',
+        log_x=False, title='Scattere Plot Sentiment ~ AvgNetWorth',
+        savefig=True, dir_output=dir_results)
+"""
+
+###############################################################################
+# Write Prepared Dataset to CSV 
+###############################################################################
+
+#d_grouped_wout.to_csv(os.path.join(dir_data, 'ols_transformed_data.csv'))
+
+
 
 ###############################################################################
 # EDA Independent & Dependent Variables 
@@ -150,33 +153,32 @@ m1.sms_qqplot(data=d_grouped, var_name='AverageNetWorth',
 ###############################################################################
 # Fit OLS Model 
 ###############################################################################
-"""
-m1.OLS(d_grouped, logx=True,
-        x_vars=FEATURES, reg=True,
-        title='OLS Sent on Log NetWorth All Features - Lasso',
-        dir_output=dir_output)
-"""
+
+m1.OLS(d_grouped_wout, logx=True,
+        x_vars=['AverageNetWorth'], reg=False,
+        title='OLS Sentiment on All Features w Lasso Ridge',
+        dir_output=dir_results_ols)
+
 
 ###############################################################################
-# Fit OLS Model 
+# Fit OLS Model - Sub Feature 
 ###############################################################################
 
-def reg_poly(data, degree):
-    # Convert AvgNetWorth Log
-    data = data[data['AverageNetWorth'] > 0]
-    data['AverageNetWorth'] = np.log(data['AverageNetWorth'].values)
-
-    x = data['AverageNetWorth'].values
-    y = data['sent_score'].values
-    
-    model = f'sent_score ~ AverageNetWorth + I(AverageNetWorth**{degree})'
-    model_fit = smf.ols(formula = model, data = data).fit()
-    
-    print('###########################################')
-    print(model_fit.summary())
+"""
+sub_var='party_R'
+m1.OLS_feature_sub(d_grouped_wout, logx=True,
+        x_vars=['AverageNetWorth'], sub_var=sub_var, reg=False,
+        title=f'OLS Sentiment on LogAvgNetWorth - {sub_var}',
+        dir_output=dir_results_ols)
+"""
 
 
-#reg_poly(d_grouped, degree=3)
+###############################################################################
+# Fit OLS Polynomial Form 
+###############################################################################
+
+#m1.reg_poly(d_grouped_wout, logx=True, degree=3)
+
 
 ###############################################################################
 # Fit Random Forest Model 
