@@ -38,7 +38,7 @@ warnings.filterwarnings('ignore')
 ###############################################################################
 # Define Directories 
 ###############################################################################
-dir_repo = r'/home/cc2/Desktop/repositories/gsu_legal_analytics_course/project'
+dir_repo = 'C:\\Users\\chris.cirelli\\Desktop\\repositories\\gsu_legal_analytics_course\\project'
 dir_data=os.path.join(dir_repo, 'data')
 dir_scripts=os.path.join(dir_repo, 'scripts')
 dir_results=os.path.join(dir_repo, 'results')
